@@ -1634,15 +1634,20 @@
                     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 1;
                     const visibleHeight = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
                     const visibilityRatio = clamp(visibleHeight / rect.height, 0, 1);
-                    // Start pushing blur only when the title is almost out of view.
-                    const triggerRatio = 0.22;
+                    // Start blur late, but with enough range to be clearly perceptible.
+                    const triggerRatio = 0.38;
                     const progress = visibilityRatio >= triggerRatio
                         ? 0
                         : clamp((triggerRatio - visibilityRatio) / triggerRatio, 0, 1);
                     const eased = progress * progress * (3 - (2 * progress)); // smoothstep
-                    const blurPx = eased * 26;
-                    heroTitleWrap.style.filter = blurPx < 0.08 ? 'none' : `blur(${blurPx.toFixed(2)}px)`;
-                    heroTitleWrap.style.opacity = '1';
+                    const endBoost = visibilityRatio < 0.08 ? (0.08 - visibilityRatio) * 9 : 0;
+                    const blurPx = (eased * 68) + endBoost;
+                    const contrast = (1 - (eased * 0.28)).toFixed(3);
+                    const opacity = (1 - (eased * 0.36)).toFixed(3);
+                    heroTitleWrap.style.filter = blurPx < 0.12
+                        ? 'none'
+                        : `blur(${blurPx.toFixed(2)}px) contrast(${contrast})`;
+                    heroTitleWrap.style.opacity = opacity;
                 };
                 const applyHeroScrollTitleFx = (effectValue) => {
                     const matched = scrollTitleFxOptions.find((effectOption) => effectOption.value === effectValue) || scrollTitleFxOptions[0];
