@@ -132,6 +132,11 @@
         }
         #hero-img {
             filter: var(--hero-video-filter);
+            transition: opacity 0.45s ease;
+        }
+        #hero-scroll-img {
+            filter: var(--hero-video-filter);
+            transition: opacity 0.45s ease;
         }
         #hero-title-wrap {
             transition: filter 0.24s ease, opacity 0.24s ease;
@@ -303,6 +308,14 @@
                 <video id="hero-img" class="w-full h-full object-cover opacity-80 scale-110" autoplay muted playsinline preload="auto">
                     <source src="./assets/hero.mp4" type="video/mp4">
                 </video>
+                <img
+                    id="hero-scroll-img"
+                    src="./assets/hero-scroll/scene-1.png"
+                    alt="Hero scroll image"
+                    class="absolute inset-0 w-full h-full object-cover scale-110 opacity-0 pointer-events-none select-none"
+                    loading="eager"
+                    decoding="async"
+                >
             </div>
             <div id="hero-title-wrap" class="relative z-10 w-full text-white">
                 <h1 id="hero-title" class="font-serif flex flex-col items-center text-center">
@@ -334,6 +347,13 @@
                             <input id="variable-axis-slider" type="range" min="100" max="900" step="10" class="w-full accent-white">
                             <span id="variable-axis-value" class="text-[11px] text-right text-white/80 tabular-nums">100</span>
                         </div>
+                    </div>
+                    <label for="hero-background-picker" class="font-mono-label block text-[11px] text-white/90 mt-3 mb-1">Hero Background</label>
+                    <div class="grid grid-cols-[32px_1fr_32px] gap-2 items-center">
+                        <button id="hero-background-prev" type="button" class="h-9 border border-white/40 rounded bg-black/55 text-white text-base leading-none">◀</button>
+                        <select id="hero-background-picker" class="w-full bg-black/60 border border-white/40 rounded px-2 py-1.5 text-sm text-white outline-none">
+                        </select>
+                        <button id="hero-background-next" type="button" class="h-9 border border-white/40 rounded bg-black/55 text-white text-base leading-none">▶</button>
                     </div>
                     <label for="text-effect-picker" class="font-mono-label block text-[11px] text-white/90 mt-3 mb-1">Text Effect</label>
                     <div class="grid grid-cols-[32px_1fr_32px] gap-2 items-center">
@@ -836,6 +856,9 @@
             const variableAxisLabel = document.getElementById('variable-axis-label');
             const variableAxisSlider = document.getElementById('variable-axis-slider');
             const variableAxisValue = document.getElementById('variable-axis-value');
+            const heroBackgroundPrev = document.getElementById('hero-background-prev');
+            const heroBackgroundPicker = document.getElementById('hero-background-picker');
+            const heroBackgroundNext = document.getElementById('hero-background-next');
             const textEffectPrev = document.getElementById('text-effect-prev');
             const textEffectPicker = document.getElementById('text-effect-picker');
             const textEffectNext = document.getElementById('text-effect-next');
@@ -876,6 +899,7 @@
             const heroLetterSpacingValue = document.getElementById('hero-letter-spacing-value');
             const heroLineHeightValue = document.getElementById('hero-line-height-value');
             const heroVideo = document.getElementById('hero-img');
+            const heroScrollImage = document.getElementById('hero-scroll-img');
             const heroTitle = document.getElementById('hero-title');
             const heroTitleWrap = document.getElementById('hero-title-wrap');
             const heroSection = document.getElementById('hero');
@@ -922,6 +946,10 @@
                 { label: "Off", value: "off" },
                 { label: "On", value: "on" }
             ];
+            const heroBackgroundOptions = [
+                { label: "Video", value: "video" },
+                { label: "Scroll Images", value: "scroll-images" }
+            ];
             const textEffectOptions = [
                 { label: "Off", value: "off" },
                 { label: "Water Ripple (Subtle)", value: "ripple" },
@@ -960,6 +988,9 @@
                 variableAxisLabel &&
                 variableAxisSlider &&
                 variableAxisValue &&
+                heroBackgroundPrev &&
+                heroBackgroundPicker &&
+                heroBackgroundNext &&
                 textEffectPrev &&
                 textEffectPicker &&
                 textEffectNext &&
@@ -1000,6 +1031,7 @@
                 heroLetterSpacingValue &&
                 heroLineHeightValue &&
                 heroVideo &&
+                heroScrollImage &&
                 heroTitle &&
                 heroTitleWrap
             ) {
@@ -1031,6 +1063,12 @@
                     option.value = cursorEffectOption.value;
                     option.textContent = cursorEffectOption.label;
                     cursorEffectPicker.appendChild(option);
+                });
+                heroBackgroundOptions.forEach((heroBackgroundOption) => {
+                    const option = document.createElement('option');
+                    option.value = heroBackgroundOption.value;
+                    option.textContent = heroBackgroundOption.label;
+                    heroBackgroundPicker.appendChild(option);
                 });
                 textEffectOptions.forEach((textEffectOption) => {
                     const option = document.createElement('option');
@@ -1104,6 +1142,50 @@
                         heroTitle.style.fontOpticalSizing = 'none';
                     }
                     localStorage.setItem(storageKey, String(axisValue));
+                };
+                const heroScrollImageSources = [
+                    './assets/hero-scroll/scene-1.png',
+                    './assets/hero-scroll/scene-2.png',
+                    './assets/hero-scroll/scene-3.png',
+                    './assets/hero-scroll/scene-4.png',
+                    './assets/hero-scroll/scene-5.png'
+                ];
+                let heroBackgroundMode = 'video';
+                let activeHeroScrollImageIndex = -1;
+                const setHeroScrollImage = (nextIndex) => {
+                    const maxIndex = Math.max(0, heroScrollImageSources.length - 1);
+                    const normalizedIndex = clamp(nextIndex, 0, maxIndex);
+                    if (normalizedIndex === activeHeroScrollImageIndex) return;
+                    activeHeroScrollImageIndex = normalizedIndex;
+                    heroScrollImage.src = heroScrollImageSources[normalizedIndex];
+                };
+                const updateHeroScrollImageFromScroll = () => {
+                    if (heroBackgroundMode !== 'scroll-images') return;
+                    const scrollY = window.scrollY || window.pageYOffset || 0;
+                    // Higher sensitivity: cycle through the 5 images in the early scroll range.
+                    const transitionSpan = Math.max(220, window.innerHeight * 0.55);
+                    const progress = clamp(scrollY / transitionSpan, 0, 1);
+                    const rawIndex = Math.floor(progress * heroScrollImageSources.length);
+                    const nextIndex = Math.min(heroScrollImageSources.length - 1, rawIndex);
+                    setHeroScrollImage(nextIndex);
+                };
+                const applyHeroBackgroundMode = (modeValue) => {
+                    const matched = heroBackgroundOptions.find((option) => option.value === modeValue) || heroBackgroundOptions[0];
+                    heroBackgroundMode = matched.value;
+                    heroBackgroundPicker.value = matched.value;
+                    localStorage.setItem('devHeroBackgroundMode', matched.value);
+                    if (matched.value === 'video') {
+                        heroVideo.style.visibility = 'visible';
+                        heroVideo.style.opacity = '0.8';
+                        heroScrollImage.style.visibility = 'hidden';
+                        heroScrollImage.style.opacity = '0';
+                        return;
+                    }
+                    heroVideo.style.visibility = 'hidden';
+                    heroVideo.style.opacity = '0';
+                    heroScrollImage.style.visibility = 'visible';
+                    heroScrollImage.style.opacity = '0.9';
+                    updateHeroScrollImageFromScroll();
                 };
                 const heroWordElements = Array.from(heroTitle.querySelectorAll('.hero-title-word'));
                 const heroEffectWords = [];
@@ -1694,6 +1776,7 @@
                     const filterVal = `${isGrayscale ? 'grayscale(1)' : 'grayscale(0)'} ${isInvert ? 'invert(1)' : 'invert(0)'}`;
                     document.documentElement.style.setProperty('--hero-video-filter', filterVal);
                     heroVideo.style.filter = filterVal;
+                    heroScrollImage.style.filter = filterVal;
                     localStorage.setItem('devHeroGrayscale', grayscalePicker.value);
                     localStorage.setItem('devHeroInvert', invertPicker.value);
                 };
@@ -1831,6 +1914,7 @@
                     font: "'Thermal VF Thin Text', serif",
                     weight: 200,
                     variableAxisOpsz: 770,
+                    backgroundMode: "video",
                     textEffect: "mirage",
                     colorEffect: "rain-glass",
                     scrollTitleFx: "gaussian-blur",
@@ -1852,6 +1936,7 @@
                     localStorage.setItem('devHeroFont', defaultPreset.font);
                     localStorage.setItem('devHeroFontWeight', String(defaultPreset.weight));
                     localStorage.setItem('devHeroVariableAxis-thermal-vf-thin-text-opsz', String(defaultPreset.variableAxisOpsz));
+                    localStorage.setItem('devHeroBackgroundMode', defaultPreset.backgroundMode);
                     localStorage.setItem('devHeroTextEffect', defaultPreset.textEffect);
                     localStorage.setItem('devHeroColorEffect', defaultPreset.colorEffect);
                     localStorage.setItem('devHeroScrollTitleFx', defaultPreset.scrollTitleFx);
@@ -1880,12 +1965,16 @@
                 if (!localStorage.getItem('devHeroScrollTitleFx')) {
                     localStorage.setItem('devHeroScrollTitleFx', defaultPreset.scrollTitleFx);
                 }
+                if (!localStorage.getItem('devHeroBackgroundMode')) {
+                    localStorage.setItem('devHeroBackgroundMode', defaultPreset.backgroundMode);
+                }
 
                 const savedFont = localStorage.getItem('devHeroFont');
                 const savedWeight = localStorage.getItem('devHeroFontWeight');
                 const savedGrayscale = localStorage.getItem('devHeroGrayscale');
                 const savedInvert = localStorage.getItem('devHeroInvert');
                 const savedCursorEffect = localStorage.getItem('devCursorEffect');
+                const savedBackgroundMode = localStorage.getItem('devHeroBackgroundMode');
                 const savedTextEffect = localStorage.getItem('devHeroTextEffect');
                 const savedColorEffect = localStorage.getItem('devHeroColorEffect');
                 const savedScrollTitleFx = localStorage.getItem('devHeroScrollTitleFx');
@@ -1895,6 +1984,7 @@
                 const initialFontConfig = getFontConfig(initialFont);
                 const initialWeight = refreshWeightOptions(initialFontConfig, savedWeight);
                 applyHeroFont(initialFont, initialWeight);
+                applyHeroBackgroundMode(savedBackgroundMode || defaultPreset.backgroundMode);
                 applyHeroTextEffect(savedTextEffect || defaultPreset.textEffect);
                 applyHeroColorEffect(savedColorEffect || defaultPreset.colorEffect);
                 applyHeroScrollTitleFx(savedScrollTitleFx || defaultPreset.scrollTitleFx);
@@ -1928,6 +2018,9 @@
                 variableAxisSlider.addEventListener('input', () => {
                     const activeFontConfig = getFontConfig(fontPicker.value);
                     applyHeroVariableAxis(activeFontConfig, Number(variableAxisSlider.value));
+                });
+                heroBackgroundPicker.addEventListener('change', () => {
+                    applyHeroBackgroundMode(heroBackgroundPicker.value);
                 });
                 textEffectPicker.addEventListener('change', () => {
                     applyHeroTextEffect(textEffectPicker.value);
@@ -1985,6 +2078,8 @@
                 fontNext.addEventListener('click', () => cycleSelect(fontPicker, 1));
                 fontWeightPrev.addEventListener('click', () => cycleSelect(fontWeightPicker, -1));
                 fontWeightNext.addEventListener('click', () => cycleSelect(fontWeightPicker, 1));
+                heroBackgroundPrev.addEventListener('click', () => cycleSelect(heroBackgroundPicker, -1));
+                heroBackgroundNext.addEventListener('click', () => cycleSelect(heroBackgroundPicker, 1));
                 textEffectPrev.addEventListener('click', () => cycleSelect(textEffectPicker, -1));
                 textEffectNext.addEventListener('click', () => cycleSelect(textEffectPicker, 1));
                 colorEffectPrev.addEventListener('click', () => cycleSelect(colorEffectPicker, -1));
@@ -2001,6 +2096,8 @@
                 indexCaseNext.addEventListener('click', () => cycleSelect(indexCasePicker, 1));
                 window.addEventListener('scroll', () => applyDevContext(detectDevContext()), { passive: true });
                 window.addEventListener('resize', () => applyDevContext(detectDevContext()));
+                window.addEventListener('scroll', updateHeroScrollImageFromScroll, { passive: true });
+                window.addEventListener('resize', updateHeroScrollImageFromScroll);
                 window.addEventListener('scroll', updateHeroScrollTitleEffect, { passive: true });
                 window.addEventListener('resize', updateHeroScrollTitleEffect);
                 window.addEventListener('scroll', hideDevTextInspector, { passive: true });
