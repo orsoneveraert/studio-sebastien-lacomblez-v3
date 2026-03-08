@@ -265,7 +265,7 @@
         <!-- Hero Section -->
         <section class="relative h-[100svh] w-full flex flex-col justify-center p-6 md:p-10 overflow-hidden" id="hero">
             <div class="absolute inset-0 z-0 bg-black">
-                <video id="hero-img" class="w-full h-full object-cover opacity-80 scale-110" autoplay muted loop playsinline preload="auto">
+                <video id="hero-img" class="w-full h-full object-cover opacity-80 scale-110" autoplay muted playsinline preload="auto">
                     <source src="./assets/hero.mp4" type="video/mp4">
                 </video>
             </div>
@@ -292,6 +292,13 @@
                         <select id="font-weight-picker" class="w-full bg-black/60 border border-white/40 rounded px-2 py-1.5 text-sm text-white outline-none">
                         </select>
                         <button id="font-weight-next" type="button" class="h-9 border border-white/40 rounded bg-black/55 text-white text-base leading-none">▶</button>
+                    </div>
+                    <div id="variable-axis-control" class="hidden">
+                        <label for="variable-axis-slider" id="variable-axis-label" class="font-mono-label block text-[11px] text-white/90 mt-3 mb-1">Variable Axis</label>
+                        <div class="grid grid-cols-[1fr_54px] gap-2 items-center">
+                            <input id="variable-axis-slider" type="range" min="100" max="900" step="10" class="w-full accent-white">
+                            <span id="variable-axis-value" class="text-[11px] text-right text-white/80 tabular-nums">100</span>
+                        </div>
                     </div>
                     <label for="grayscale-picker" class="font-mono-label block text-[11px] text-white/90 mt-3 mb-1">Grayscale</label>
                     <div class="grid grid-cols-[32px_1fr_32px] gap-2 items-center">
@@ -595,10 +602,90 @@
                 document.body.classList.remove('cursor-effect-on');
             }
 
-            // 3. Hero Entrance Animation
+            // 3. Hero Video Boomerang Playback (forward/backward loop)
+            const heroVideoElement = document.getElementById('hero-img');
+            if (heroVideoElement) {
+                heroVideoElement.loop = false;
+                heroVideoElement.removeAttribute('loop');
+
+                let boomerangDirection = 1;
+                let boomerangRafId = null;
+                let lastBoomerangTimestamp = null;
+
+                const stopBoomerang = () => {
+                    if (boomerangRafId !== null) {
+                        cancelAnimationFrame(boomerangRafId);
+                        boomerangRafId = null;
+                    }
+                };
+
+                const boomerangStep = (timestamp) => {
+                    const duration = heroVideoElement.duration;
+                    if (!Number.isFinite(duration) || duration <= 0) {
+                        boomerangRafId = requestAnimationFrame(boomerangStep);
+                        return;
+                    }
+
+                    if (lastBoomerangTimestamp === null) {
+                        lastBoomerangTimestamp = timestamp;
+                        boomerangRafId = requestAnimationFrame(boomerangStep);
+                        return;
+                    }
+
+                    const deltaSeconds = Math.min(0.05, (timestamp - lastBoomerangTimestamp) / 1000);
+                    lastBoomerangTimestamp = timestamp;
+                    const speed = 1;
+                    let nextTime = heroVideoElement.currentTime + (deltaSeconds * speed * boomerangDirection);
+
+                    if (nextTime >= duration) {
+                        nextTime = duration;
+                        boomerangDirection = -1;
+                    } else if (nextTime <= 0) {
+                        nextTime = 0;
+                        boomerangDirection = 1;
+                    }
+
+                    heroVideoElement.currentTime = nextTime;
+                    boomerangRafId = requestAnimationFrame(boomerangStep);
+                };
+
+                const startBoomerang = ({ preserveDirection = false } = {}) => {
+                    if (!preserveDirection) {
+                        boomerangDirection = 1;
+                    }
+                    stopBoomerang();
+                    lastBoomerangTimestamp = null;
+                    heroVideoElement.pause();
+                    boomerangRafId = requestAnimationFrame(boomerangStep);
+                };
+                const primeAndStartBoomerang = () => {
+                    const playPromise = heroVideoElement.play();
+                    if (playPromise && typeof playPromise.then === 'function') {
+                        playPromise.then(() => startBoomerang()).catch(() => startBoomerang());
+                        return;
+                    }
+                    startBoomerang();
+                };
+
+                if (heroVideoElement.readyState >= 1) {
+                    primeAndStartBoomerang();
+                } else {
+                    heroVideoElement.addEventListener('loadedmetadata', () => primeAndStartBoomerang(), { once: true });
+                }
+
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden) {
+                        stopBoomerang();
+                        return;
+                    }
+                    startBoomerang({ preserveDirection: true });
+                });
+            }
+
+            // 4. Hero Entrance Animation
             gsap.to("#hero-img", { scale: 1, opacity: 1, duration: 2.5, ease: "power3.out" });
 
-            // 4. Scroll Reveal Animations (Staggered)
+            // 5. Scroll Reveal Animations (Staggered)
             const revealElements = document.querySelectorAll('.gs-reveal');
             revealElements.forEach(el => {
                 gsap.fromTo(el, 
@@ -617,7 +704,7 @@
                 );
             });
 
-            // 5. Image Parallax inside containers
+            // 6. Image Parallax inside containers
             const parallaxImages = document.querySelectorAll('.img-parallax');
             parallaxImages.forEach(img => {
                 gsap.to(img, {
@@ -648,7 +735,7 @@
                 );
             });
 
-            // 6. Index Hover Image Logic
+            // 7. Index Hover Image Logic
             const indexRows = document.querySelectorAll('.index-row-container');
             const hoverImgContainer = document.getElementById('index-hover-img');
             const hoverImgTarget = document.getElementById('index-img-target');
@@ -682,13 +769,17 @@
                 });
             }
 
-            // 7. Dev Mode Hero Controls (Ctrl + Shift + D)
+            // 8. Dev Mode Hero Controls (Ctrl + Shift + D)
             const devModePanel = document.getElementById('dev-mode-panel');
             const devHeroControls = document.getElementById('dev-hero-controls');
             const devIndexControls = document.getElementById('dev-index-controls');
             const devTextInspector = document.getElementById('dev-text-inspector');
             const fontPicker = document.getElementById('font-picker');
             const fontWeightPicker = document.getElementById('font-weight-picker');
+            const variableAxisControl = document.getElementById('variable-axis-control');
+            const variableAxisLabel = document.getElementById('variable-axis-label');
+            const variableAxisSlider = document.getElementById('variable-axis-slider');
+            const variableAxisValue = document.getElementById('variable-axis-value');
             const fontPickerValue = document.getElementById('font-picker-value');
             const fontPrev = document.getElementById('font-prev');
             const fontNext = document.getElementById('font-next');
@@ -736,7 +827,13 @@
             const serifFontOptions = [
                 { label: "DM Serif Display (Default)", family: "'DM Serif Display', serif", googleName: "DM Serif Display", weights: [400] },
                 { label: "Violet Sans", family: "'Violet Sans', sans-serif", googleName: "Violet Sans", weights: [400] },
-                { label: "Thermal VF Thin Text", family: "'Thermal VF Thin Text', serif", googleName: "Thermal VF Thin Text", weights: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
+                {
+                    label: "Thermal VF Thin Text",
+                    family: "'Thermal VF Thin Text', serif",
+                    googleName: "Thermal VF Thin Text",
+                    weights: [100, 200, 300, 400, 500, 600, 700, 800, 900],
+                    variableAxis: { tag: "opsz", label: "Optical Size", min: 100, max: 900, step: 10, default: 100 }
+                },
                 { label: "Verdigris MVB Pro Big", family: "'Verdigris MVB Pro Big', serif", googleName: "Verdigris MVB Pro Big", weights: [400, 700] },
                 { label: "Verdigris MVB Pro Text", family: "'Verdigris MVB Pro Text', serif", googleName: "Verdigris MVB Pro Text", weights: [400, 700] },
                 { label: "SangBleu Kingdom", family: "'SangBleu Kingdom', serif", googleName: "SangBleu Kingdom", weights: [300, 400, 500, 700] },
@@ -771,6 +868,10 @@
                 devTextInspector &&
                 fontPicker &&
                 fontWeightPicker &&
+                variableAxisControl &&
+                variableAxisLabel &&
+                variableAxisSlider &&
+                variableAxisValue &&
                 fontPickerValue &&
                 fontPrev &&
                 fontNext &&
@@ -843,6 +944,51 @@
                 const getFontConfig = (fontFamily) => {
                     return serifFontOptions.find((option) => option.family === fontFamily) || serifFontOptions[0];
                 };
+                const getVariableAxisStorageKey = (fontConfig, axisConfig) => {
+                    const baseName = (fontConfig.googleName || fontConfig.label || fontConfig.family)
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/^-+|-+$/g, '');
+                    return `devHeroVariableAxis-${baseName}-${axisConfig.tag}`;
+                };
+                const getAxisDecimals = (stepValue) => {
+                    const stepText = String(stepValue);
+                    if (!stepText.includes('.')) return 0;
+                    return Math.min(3, stepText.split('.')[1].length);
+                };
+                const applyHeroVariableAxis = (fontConfig, requestedValue = null) => {
+                    const axisConfig = fontConfig.variableAxis;
+                    if (!axisConfig) {
+                        variableAxisControl.classList.add('hidden');
+                        heroTitle.style.removeProperty('font-variation-settings');
+                        heroTitle.style.fontOpticalSizing = 'auto';
+                        return;
+                    }
+
+                    const min = Number.isFinite(axisConfig.min) ? axisConfig.min : 0;
+                    const max = Number.isFinite(axisConfig.max) ? axisConfig.max : min;
+                    const step = Number.isFinite(axisConfig.step) && axisConfig.step > 0 ? axisConfig.step : 1;
+                    const fallbackValue = Number.isFinite(axisConfig.default) ? axisConfig.default : min;
+                    const storageKey = getVariableAxisStorageKey(fontConfig, axisConfig);
+                    const storedValue = Number(localStorage.getItem(storageKey));
+                    const effectiveRequested = Number.isFinite(requestedValue) ? requestedValue : storedValue;
+                    const normalizedValue = clamp(effectiveRequested, min, max);
+                    const axisValue = Number.isFinite(normalizedValue) ? normalizedValue : fallbackValue;
+                    const decimals = getAxisDecimals(step);
+
+                    variableAxisControl.classList.remove('hidden');
+                    variableAxisLabel.textContent = `${axisConfig.label} (${axisConfig.tag.toUpperCase()})`;
+                    variableAxisSlider.min = String(min);
+                    variableAxisSlider.max = String(max);
+                    variableAxisSlider.step = String(step);
+                    variableAxisSlider.value = String(axisValue);
+                    variableAxisValue.textContent = axisValue.toFixed(decimals);
+                    heroTitle.style.fontVariationSettings = `'${axisConfig.tag}' ${axisValue}`;
+                    if (axisConfig.tag === 'opsz') {
+                        heroTitle.style.fontOpticalSizing = 'none';
+                    }
+                    localStorage.setItem(storageKey, String(axisValue));
+                };
 
                 const refreshWeightOptions = (fontConfig, preferredWeight) => {
                     fontWeightPicker.innerHTML = '';
@@ -868,9 +1014,10 @@
                 const applyHeroFont = (fontFamily, fontWeight) => {
                     heroTitle.style.fontFamily = fontFamily;
                     heroTitle.style.fontWeight = String(fontWeight);
-                    const matched = serifFontOptions.find((option) => option.family === fontFamily);
+                    const matched = getFontConfig(fontFamily);
                     loadFontFace(matched ? matched.googleName : null, fontWeight);
                     fontPickerValue.textContent = `Current: ${matched ? matched.label : fontFamily} ${fontWeight}`;
+                    applyHeroVariableAxis(matched);
                     localStorage.setItem('devHeroFont', fontFamily);
                     localStorage.setItem('devHeroFontWeight', String(fontWeight));
                 };
@@ -1087,6 +1234,10 @@
                 });
                 fontWeightPicker.addEventListener('change', () => {
                     applyHeroFont(fontPicker.value, Number(fontWeightPicker.value));
+                });
+                variableAxisSlider.addEventListener('input', () => {
+                    const activeFontConfig = getFontConfig(fontPicker.value);
+                    applyHeroVariableAxis(activeFontConfig, Number(variableAxisSlider.value));
                 });
                 grayscalePicker.addEventListener('change', () => {
                     updateVideoFilters();
