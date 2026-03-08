@@ -133,6 +133,10 @@
         #hero-img {
             filter: var(--hero-video-filter);
         }
+        #hero-title-wrap {
+            transition: filter 0.24s ease, opacity 0.24s ease;
+            will-change: filter, opacity;
+        }
         #hero-title {
             font-size: var(--hero-title-size-mobile);
             line-height: var(--hero-title-line-height);
@@ -300,7 +304,7 @@
                     <source src="./assets/hero.mp4" type="video/mp4">
                 </video>
             </div>
-            <div class="relative z-10 w-full text-white">
+            <div id="hero-title-wrap" class="relative z-10 w-full text-white">
                 <h1 id="hero-title" class="font-serif flex flex-col items-center text-center">
                     <span class="block hero-title-word">studio</span>
                     <span class="block hero-title-word">sébastien</span>
@@ -344,6 +348,13 @@
                         <select id="color-effect-picker" class="w-full bg-black/60 border border-white/40 rounded px-2 py-1.5 text-sm text-white outline-none">
                         </select>
                         <button id="color-effect-next" type="button" class="h-9 border border-white/40 rounded bg-black/55 text-white text-base leading-none">▶</button>
+                    </div>
+                    <label for="scroll-title-fx-picker" class="font-mono-label block text-[11px] text-white/90 mt-3 mb-1">Scroll Title FX</label>
+                    <div class="grid grid-cols-[32px_1fr_32px] gap-2 items-center">
+                        <button id="scroll-title-fx-prev" type="button" class="h-9 border border-white/40 rounded bg-black/55 text-white text-base leading-none">◀</button>
+                        <select id="scroll-title-fx-picker" class="w-full bg-black/60 border border-white/40 rounded px-2 py-1.5 text-sm text-white outline-none">
+                        </select>
+                        <button id="scroll-title-fx-next" type="button" class="h-9 border border-white/40 rounded bg-black/55 text-white text-base leading-none">▶</button>
                     </div>
                     <label for="grayscale-picker" class="font-mono-label block text-[11px] text-white/90 mt-3 mb-1">Grayscale</label>
                     <div class="grid grid-cols-[32px_1fr_32px] gap-2 items-center">
@@ -831,6 +842,9 @@
             const colorEffectPrev = document.getElementById('color-effect-prev');
             const colorEffectPicker = document.getElementById('color-effect-picker');
             const colorEffectNext = document.getElementById('color-effect-next');
+            const scrollTitleFxPrev = document.getElementById('scroll-title-fx-prev');
+            const scrollTitleFxPicker = document.getElementById('scroll-title-fx-picker');
+            const scrollTitleFxNext = document.getElementById('scroll-title-fx-next');
             const fontPickerValue = document.getElementById('font-picker-value');
             const fontPrev = document.getElementById('font-prev');
             const fontNext = document.getElementById('font-next');
@@ -863,6 +877,7 @@
             const heroLineHeightValue = document.getElementById('hero-line-height-value');
             const heroVideo = document.getElementById('hero-img');
             const heroTitle = document.getElementById('hero-title');
+            const heroTitleWrap = document.getElementById('hero-title-wrap');
             const heroSection = document.getElementById('hero');
             const indexSection = document.getElementById('index');
             const videoAwareTargets = Array.from(document.querySelectorAll('.video-aware-text'));
@@ -925,6 +940,10 @@
                 { label: "Opal Shine", value: "opal-shine" },
                 { label: "Wet Film", value: "wet-film" }
             ];
+            const scrollTitleFxOptions = [
+                { label: "Off", value: "off" },
+                { label: "Gaussian Blur Out", value: "gaussian-blur" }
+            ];
             const indexCaseOptions = [
                 { label: "All Caps", value: "uppercase" },
                 { label: "Normal Caps", value: "normalcaps" }
@@ -947,6 +966,9 @@
                 colorEffectPrev &&
                 colorEffectPicker &&
                 colorEffectNext &&
+                scrollTitleFxPrev &&
+                scrollTitleFxPicker &&
+                scrollTitleFxNext &&
                 fontPickerValue &&
                 fontPrev &&
                 fontNext &&
@@ -978,7 +1000,8 @@
                 heroLetterSpacingValue &&
                 heroLineHeightValue &&
                 heroVideo &&
-                heroTitle
+                heroTitle &&
+                heroTitleWrap
             ) {
                 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
                 const getStoredNumber = (key, fallback) => {
@@ -1020,6 +1043,12 @@
                     option.value = colorEffectOption.value;
                     option.textContent = colorEffectOption.label;
                     colorEffectPicker.appendChild(option);
+                });
+                scrollTitleFxOptions.forEach((scrollTitleFxOption) => {
+                    const option = document.createElement('option');
+                    option.value = scrollTitleFxOption.value;
+                    option.textContent = scrollTitleFxOption.label;
+                    scrollTitleFxPicker.appendChild(option);
                 });
                 indexCaseOptions.forEach((caseOption) => {
                     const option = document.createElement('option');
@@ -1588,6 +1617,40 @@
                     renderHeroColorStyles(performance.now() / 1000);
                     startHeroColorEffectLoop();
                 };
+                let heroScrollTitleFxMode = 'off';
+                const updateHeroScrollTitleEffect = () => {
+                    if (!heroTitleWrap) return;
+                    if (heroScrollTitleFxMode === 'off') {
+                        heroTitleWrap.style.filter = 'none';
+                        heroTitleWrap.style.opacity = '1';
+                        return;
+                    }
+                    const rect = heroTitle.getBoundingClientRect();
+                    if (rect.height <= 0) {
+                        heroTitleWrap.style.filter = 'none';
+                        heroTitleWrap.style.opacity = '1';
+                        return;
+                    }
+                    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 1;
+                    const visibleHeight = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
+                    const visibilityRatio = clamp(visibleHeight / rect.height, 0, 1);
+                    // Start pushing blur only when the title is almost out of view.
+                    const triggerRatio = 0.22;
+                    const progress = visibilityRatio >= triggerRatio
+                        ? 0
+                        : clamp((triggerRatio - visibilityRatio) / triggerRatio, 0, 1);
+                    const eased = progress * progress * (3 - (2 * progress)); // smoothstep
+                    const blurPx = eased * 26;
+                    heroTitleWrap.style.filter = blurPx < 0.08 ? 'none' : `blur(${blurPx.toFixed(2)}px)`;
+                    heroTitleWrap.style.opacity = '1';
+                };
+                const applyHeroScrollTitleFx = (effectValue) => {
+                    const matched = scrollTitleFxOptions.find((effectOption) => effectOption.value === effectValue) || scrollTitleFxOptions[0];
+                    heroScrollTitleFxMode = matched.value;
+                    scrollTitleFxPicker.value = matched.value;
+                    localStorage.setItem('devHeroScrollTitleFx', matched.value);
+                    updateHeroScrollTitleEffect();
+                };
 
                 const refreshWeightOptions = (fontConfig, preferredWeight) => {
                     fontWeightPicker.innerHTML = '';
@@ -1765,6 +1828,7 @@
                     variableAxisOpsz: 770,
                     textEffect: "mirage",
                     colorEffect: "rain-glass",
+                    scrollTitleFx: "gaussian-blur",
                     grayscale: "off",
                     invert: "off",
                     cursorEffect: "on",
@@ -1785,6 +1849,7 @@
                     localStorage.setItem('devHeroVariableAxis-thermal-vf-thin-text-opsz', String(defaultPreset.variableAxisOpsz));
                     localStorage.setItem('devHeroTextEffect', defaultPreset.textEffect);
                     localStorage.setItem('devHeroColorEffect', defaultPreset.colorEffect);
+                    localStorage.setItem('devHeroScrollTitleFx', defaultPreset.scrollTitleFx);
                     localStorage.setItem('devHeroGrayscale', defaultPreset.grayscale);
                     localStorage.setItem('devHeroInvert', defaultPreset.invert);
                     localStorage.setItem('devCursorEffect', defaultPreset.cursorEffect);
@@ -1807,6 +1872,9 @@
                 if (!localStorage.getItem('devHeroColorEffect')) {
                     localStorage.setItem('devHeroColorEffect', defaultPreset.colorEffect);
                 }
+                if (!localStorage.getItem('devHeroScrollTitleFx')) {
+                    localStorage.setItem('devHeroScrollTitleFx', defaultPreset.scrollTitleFx);
+                }
 
                 const savedFont = localStorage.getItem('devHeroFont');
                 const savedWeight = localStorage.getItem('devHeroFontWeight');
@@ -1815,6 +1883,7 @@
                 const savedCursorEffect = localStorage.getItem('devCursorEffect');
                 const savedTextEffect = localStorage.getItem('devHeroTextEffect');
                 const savedColorEffect = localStorage.getItem('devHeroColorEffect');
+                const savedScrollTitleFx = localStorage.getItem('devHeroScrollTitleFx');
                 const savedIndexCase = localStorage.getItem('devIndexCase');
                 const initialFont = serifFontOptions.some((option) => option.family === savedFont) ? savedFont : defaultPreset.font;
                 fontPicker.value = initialFont;
@@ -1823,6 +1892,7 @@
                 applyHeroFont(initialFont, initialWeight);
                 applyHeroTextEffect(savedTextEffect || defaultPreset.textEffect);
                 applyHeroColorEffect(savedColorEffect || defaultPreset.colorEffect);
+                applyHeroScrollTitleFx(savedScrollTitleFx || defaultPreset.scrollTitleFx);
                 grayscalePicker.value = savedGrayscale || defaultPreset.grayscale;
                 invertPicker.value = savedInvert || defaultPreset.invert;
                 updateVideoFilters();
@@ -1859,6 +1929,9 @@
                 });
                 colorEffectPicker.addEventListener('change', () => {
                     applyHeroColorEffect(colorEffectPicker.value);
+                });
+                scrollTitleFxPicker.addEventListener('change', () => {
+                    applyHeroScrollTitleFx(scrollTitleFxPicker.value);
                 });
                 grayscalePicker.addEventListener('change', () => {
                     updateVideoFilters();
@@ -1911,6 +1984,8 @@
                 textEffectNext.addEventListener('click', () => cycleSelect(textEffectPicker, 1));
                 colorEffectPrev.addEventListener('click', () => cycleSelect(colorEffectPicker, -1));
                 colorEffectNext.addEventListener('click', () => cycleSelect(colorEffectPicker, 1));
+                scrollTitleFxPrev.addEventListener('click', () => cycleSelect(scrollTitleFxPicker, -1));
+                scrollTitleFxNext.addEventListener('click', () => cycleSelect(scrollTitleFxPicker, 1));
                 grayscalePrev.addEventListener('click', () => cycleSelect(grayscalePicker, -1));
                 grayscaleNext.addEventListener('click', () => cycleSelect(grayscalePicker, 1));
                 invertPrev.addEventListener('click', () => cycleSelect(invertPicker, -1));
@@ -1921,6 +1996,8 @@
                 indexCaseNext.addEventListener('click', () => cycleSelect(indexCasePicker, 1));
                 window.addEventListener('scroll', () => applyDevContext(detectDevContext()), { passive: true });
                 window.addEventListener('resize', () => applyDevContext(detectDevContext()));
+                window.addEventListener('scroll', updateHeroScrollTitleEffect, { passive: true });
+                window.addEventListener('resize', updateHeroScrollTitleEffect);
                 window.addEventListener('scroll', hideDevTextInspector, { passive: true });
                 window.addEventListener('resize', hideDevTextInspector);
                 document.addEventListener('visibilitychange', () => {
